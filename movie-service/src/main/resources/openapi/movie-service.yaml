@@ -1,0 +1,308 @@
+openapi: 3.0.3
+info:
+  title: Movie Service API
+  version: 1.0.0
+  description: APIs for customers to browse movies and shows across cities, languages and genres.
+servers:
+  - url: /api
+
+paths:
+  /movies:
+    get:
+      operationId: listMovies
+      summary: Browse movies
+      description: >
+        Returns movies available on the platform, optionally filtered by city, language and genre.
+        City filter is applied via associated shows in that city.
+      tags:
+        - Movies
+      parameters:
+        - in: query
+          name: city
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: language
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: genre
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MovieSummary'
+
+  /movies/{id}:
+    get:
+      operationId: getMovie
+      summary: Get movie details
+      tags:
+        - Movies
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Movie details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieDetails'
+        '404':
+          description: Movie not found
+
+  /movies/{id}/shows:
+    get:
+      operationId: listMovieShows
+      summary: Browse theatres running the movie (with show timings by date)
+      description: >
+        Browse theatres currently running the selected movie in a town, including show timing by a chosen date.
+        Returns one record per show; each includes theatreId, city, startTime (show timing), and basePrice.
+        Use query params to filter by city (town) and/or date (show start date in UTC).
+      tags:
+        - Movies
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Movie id
+        - in: query
+          name: city
+          required: false
+          schema:
+            type: string
+          description: Town/city to filter theatres (case-insensitive)
+        - in: query
+          name: date
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Chosen date to filter shows (by show start date in UTC)
+      responses:
+        '200':
+          description: List of shows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShowResponse'
+        '404':
+          description: Movie not found
+
+  /shows:
+    post:
+      operationId: createShow
+      summary: Create a show for the day (partner)
+      description: >
+        Partner only. Creates a show (movie at theatre at a time). tenantId is taken from JWT.
+        Used by theatres to add show timings for the day.
+      tags:
+        - Shows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShowRequest'
+      responses:
+        '201':
+          description: Show created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token (tenant required)
+        '403':
+          description: Tenant context required
+
+  /shows/{id}:
+    put:
+      operationId: updateShow
+      summary: Update a show (partner)
+      description: Partner only. Update show time or base price. Only shows belonging to the JWT tenant can be updated.
+      tags:
+        - Shows
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateShowRequest'
+      responses:
+        '200':
+          description: Show updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch or show not found
+        '404':
+          description: Show not found
+    delete:
+      operationId: deleteShow
+      summary: Delete a show (partner)
+      description: Partner only. Removes the show for the day. Only shows belonging to the JWT tenant can be deleted.
+      tags:
+        - Shows
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Show deleted
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch or show not found
+        '404':
+          description: Show not found
+
+components:
+  schemas:
+    CreateShowRequest:
+      type: object
+      required:
+        - movieId
+        - theatreId
+        - city
+        - startTime
+        - basePrice
+      properties:
+        movieId:
+          type: integer
+          format: int64
+        theatreId:
+          type: integer
+          format: int64
+        city:
+          type: string
+          maxLength: 100
+        language:
+          type: string
+          maxLength: 50
+        startTime:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+          format: double
+          minimum: 0
+    UpdateShowRequest:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+          format: double
+          minimum: 0
+    MovieSummary:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        language:
+          type: string
+        genre:
+          type: string
+        durationMinutes:
+          type: integer
+          format: int32
+    MovieDetails:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        language:
+          type: string
+        genre:
+          type: string
+        description:
+          type: string
+        durationMinutes:
+          type: integer
+          format: int32
+    ShowResponse:
+      type: object
+      required:
+        - id
+        - movieId
+        - theatreId
+        - tenantId
+        - city
+        - startTime
+      properties:
+        id:
+          type: integer
+          format: int64
+        movieId:
+          type: integer
+          format: int64
+        theatreId:
+          type: integer
+          format: int64
+        tenantId:
+          type: integer
+          format: int64
+        city:
+          type: string
+        language:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+          format: double
+

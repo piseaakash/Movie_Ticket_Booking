@@ -1,0 +1,36 @@
+# Build outputs
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+*.jar
+!**/src/**/*.jar
+
+# IDE and OS
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker and K8s (avoid copying into build context)
+Dockerfile*
+.dockerignore
+**/kubernetes/
+**/k8s/
+# Do not ignore OpenAPI specs under src (they are needed for build)
+
+# Docs and non-build
+docs/
+*.md
+!README.md
+
+# Test and temp
+**/hs_err_*.log
+**/test-output/

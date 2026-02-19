@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: User Service API
+  version: 1.0.0
+  description: User registration and login APIs for the Movie Ticket Booking Platform.
+servers:
+  - url: /api
+paths:
+  /users/register:
+    post:
+      operationId: registerUser
+      summary: Register a new user
+      description: Creates a new user account with a securely hashed password.
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Validation error
+        '409':
+          description: User with the given email already exists
+  /users/login:
+    post:
+      operationId: loginUser
+      summary: Login with existing credentials
+      description: Validates email and password, then calls auth-service to issue access and refresh tokens.
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Invalid credentials
+
+  /partners/register:
+    post:
+      operationId: registerPartner
+      summary: Register a partner
+      description: Creates a user account, a PARTNER tenant, and links the user to the tenant with PARTNER_ADMIN. Optionally creates an Organisation (cinema chain brand) when organisationName is provided.
+      tags:
+        - Partners
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerRegisterRequest'
+      responses:
+        '201':
+          description: Partner successfully registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRegisterResponse'
+        '400':
+          description: Validation error
+        '409':
+          description: User with the given email already exists
+
+  /partners/login:
+    post:
+      operationId: loginPartner
+      summary: Partner login
+      description: Validates credentials (same as B2C), resolves tenant from tenantId or single PARTNER ACTIVE tenant, enforces PENDING_APPROVAL, and issues tokens with resolved roles and tenantId claim.
+      tags:
+        - Partners
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerLoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Validation error or tenant required
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Partner account pending approval
+
+components:
+  schemas:
+    RegisterUserRequest:
+      type: object
+      required:
+        - email
+        - fullName
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        fullName:
+          type: string
+          maxLength: 200
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - fullName
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+    LoginResponse:
+      type: object
+      required:
+        - user
+        - accessToken
+        - refreshToken
+        - expiresInSeconds
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresInSeconds:
+          type: integer
+          format: int64
+    PartnerRegisterRequest:
+      type: object
+      required:
+        - email
+        - fullName
+        - password
+        - tenantName
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        fullName:
+          type: string
+          maxLength: 200
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+        tenantName:
+          type: string
+          maxLength: 200
+          description: Display name for the partner tenant (e.g. theatre or chain name)
+        organisationName:
+          type: string
+          maxLength: 200
+          nullable: true
+          description: Optional organisation (cinema chain) name
+    PartnerRegisterResponse:
+      type: object
+      required:
+        - user
+        - tenantId
+        - tenantName
+        - role
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        tenantId:
+          type: integer
+          format: int64
+        tenantName:
+          type: string
+        role:
+          type: string
+          example: PARTNER_ADMIN
+    PartnerLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+        tenantId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Optional; when omitted, single PARTNER ACTIVE tenant is used or 400 tenant required

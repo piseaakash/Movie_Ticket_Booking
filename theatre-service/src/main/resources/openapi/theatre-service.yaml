@@ -1,0 +1,794 @@
+openapi: 3.0.3
+info:
+  title: Theatre Service API
+  version: 1.0.0
+  description: APIs for partners to manage their theatres (tenant/role-aware).
+servers:
+  - url: /api
+
+paths:
+  /theatres:
+    post:
+      operationId: createTheatre
+      summary: Create a theatre for the current tenant
+      description: >
+        Creates a new theatre associated with the tenant from the JWT `tenantId` claim.
+        Requires a partner role (e.g. PARTNER_ADMIN or THEATRE_MANAGER).
+      tags:
+        - Theatres
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTheatreRequest'
+      responses:
+        '201':
+          description: Theatre created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheatreResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Insufficient role or tenant mismatch
+    get:
+      operationId: listTheatres
+      summary: List theatres for the current tenant
+      description: Returns all theatres belonging to the tenant from the JWT `tenantId` claim.
+      tags:
+        - Theatres
+      responses:
+        '200':
+          description: List of theatres
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TheatreResponse'
+        '401':
+          description: Missing or invalid token
+
+  /theatres/{id}:
+    get:
+      operationId: getTheatre
+      summary: Get a theatre by id (scoped to current tenant)
+      tags:
+        - Theatres
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Theatre found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheatreResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Theatre not found
+    put:
+      operationId: updateTheatre
+      summary: Update a theatre (name/address)
+      description: >
+        Updates a theatre belonging to the current tenant. Requires partner role.
+      tags:
+        - Theatres
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTheatreRequest'
+      responses:
+        '200':
+          description: Theatre updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheatreResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Insufficient role or tenant mismatch
+        '404':
+          description: Theatre not found
+    delete:
+      operationId: deleteTheatre
+      summary: Delete a theatre
+      description: >
+        Deletes a theatre belonging to the current tenant. Requires partner role.
+      tags:
+        - Theatres
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Theatre deleted
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Insufficient role or tenant mismatch
+        '404':
+          description: Theatre not found
+
+  /theatres/{theatreId}/screens:
+    post:
+      operationId: createScreen
+      summary: Create a screen in a theatre
+      description: Partner only. Creates a screen for the given theatre (tenant-scoped).
+      tags:
+        - Screens
+      parameters:
+        - in: path
+          name: theatreId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScreenRequest'
+      responses:
+        '201':
+          description: Screen created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Insufficient role or tenant mismatch
+        '404':
+          description: Theatre not found
+    get:
+      operationId: listScreens
+      summary: List screens for a theatre
+      tags:
+        - Screens
+      parameters:
+        - in: path
+          name: theatreId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of screens
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScreenResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Theatre not found
+
+  /theatres/{theatreId}/screens/{screenId}:
+    get:
+      operationId: getScreen
+      summary: Get a screen by id
+      tags:
+        - Screens
+      parameters:
+        - in: path
+          name: theatreId
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Screen found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+    put:
+      operationId: updateScreen
+      summary: Update a screen
+      tags:
+        - Screens
+      parameters:
+        - in: path
+          name: theatreId
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateScreenRequest'
+      responses:
+        '200':
+          description: Screen updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+    delete:
+      operationId: deleteScreen
+      summary: Delete a screen
+      tags:
+        - Screens
+      parameters:
+        - in: path
+          name: theatreId
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Screen deleted
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+
+  /screens/{screenId}/seats:
+    post:
+      operationId: createSeat
+      summary: Add a seat to a screen
+      description: Partner only. Label must be unique per screen (e.g. A1).
+      tags:
+        - Seats
+      parameters:
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSeatRequest'
+      responses:
+        '201':
+          description: Seat created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatResponse'
+        '400':
+          description: Validation error or duplicate label
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+    get:
+      operationId: listSeats
+      summary: List seats for a screen
+      tags:
+        - Seats
+      parameters:
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of seats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeatResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+
+  /screens/{screenId}/seats/{seatId}:
+    delete:
+      operationId: deleteSeat
+      summary: Remove a seat from a screen
+      tags:
+        - Seats
+      parameters:
+        - in: path
+          name: screenId
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: seatId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Seat deleted
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Seat or screen not found
+
+  /shows/{showId}/screen:
+    post:
+      operationId: registerShowToScreen
+      summary: Register a show to a screen (create seat inventory)
+      description: >
+        Partner only. Binds show (from movie-service) to a screen and creates
+        AVAILABLE inventory for all seats of that screen.
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterShowRequest'
+      responses:
+        '201':
+          description: Show registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowScreenResponse'
+        '400':
+          description: Show already registered or validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Tenant mismatch
+        '404':
+          description: Screen not found
+    get:
+      operationId: getShowScreen
+      summary: Get screen assigned to a show
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Show screen mapping
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowScreenResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Show not registered
+
+  /shows/{showId}/seats/availability:
+    get:
+      operationId: getShowSeatAvailability
+      summary: Get seat availability for a show
+      description: Returns status (AVAILABLE, LOCKED, BOOKED) per seat. Expired locks are shown as AVAILABLE.
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of seat availability
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeatAvailabilityResponse'
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Show not registered
+
+  /shows/{showId}/seats/lock:
+    post:
+      operationId: lockSeats
+      summary: Lock seats for a booking (time-bound)
+      description: >
+        Locks requested seats for the given bookingId. Uses optimistic locking;
+        fails with 409 if any seat is not AVAILABLE. Lock expires after lockTtlMinutes.
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LockSeatsRequest'
+      responses:
+        '200':
+          description: Seats locked
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Show not registered
+        '409':
+          description: One or more seats not available
+
+  /shows/{showId}/seats/release:
+    post:
+      operationId: releaseSeatLock
+      summary: Release seats for a booking
+      description: Releases all seats locked or booked by this booking (e.g. on cancel).
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseSeatsRequest'
+      responses:
+        '204':
+          description: Seats released
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Show not registered
+
+  /shows/{showId}/seats/confirm:
+    post:
+      operationId: confirmSeatLock
+      summary: Confirm seat lock (convert to BOOKED)
+      description: Call after payment success. Converts LOCKED seats for this booking to BOOKED.
+      tags:
+        - Show inventory
+      parameters:
+        - in: path
+          name: showId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmLockRequest'
+      responses:
+        '200':
+          description: Seats confirmed
+        '401':
+          description: Missing or invalid token
+        '404':
+          description: Show not registered or no locked seats for booking
+
+components:
+  schemas:
+    CreateTheatreRequest:
+      type: object
+      required:
+        - name
+        - city
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        addressLine1:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 100
+        postalCode:
+          type: string
+          maxLength: 20
+    UpdateTheatreRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        addressLine1:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 100
+        state:
+          type: string
+          maxLength: 100
+        postalCode:
+          type: string
+          maxLength: 20
+    TheatreResponse:
+      type: object
+      required:
+        - id
+        - tenantId
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+        tenantId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        addressLine1:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateScreenRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        displayOrder:
+          type: integer
+          default: 0
+    UpdateScreenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        displayOrder:
+          type: integer
+    ScreenResponse:
+      type: object
+      required:
+        - id
+        - theatreId
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+        theatreId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        displayOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateSeatRequest:
+      type: object
+      required:
+        - rowLabel
+        - seatNumber
+        - label
+      properties:
+        rowLabel:
+          type: string
+          maxLength: 10
+        seatNumber:
+          type: integer
+          minimum: 1
+        label:
+          type: string
+          maxLength: 20
+          description: Unique per screen (e.g. A1)
+    SeatResponse:
+      type: object
+      required:
+        - id
+        - screenId
+        - label
+      properties:
+        id:
+          type: integer
+          format: int64
+        screenId:
+          type: integer
+          format: int64
+        rowLabel:
+          type: string
+        seatNumber:
+          type: integer
+        label:
+          type: string
+
+    RegisterShowRequest:
+      type: object
+      required:
+        - screenId
+      properties:
+        screenId:
+          type: integer
+          format: int64
+    ShowScreenResponse:
+      type: object
+      required:
+        - showId
+        - screenId
+      properties:
+        showId:
+          type: integer
+          format: int64
+        screenId:
+          type: integer
+          format: int64
+
+    SeatAvailabilityResponse:
+      type: object
+      required:
+        - seatId
+        - label
+        - status
+      properties:
+        seatId:
+          type: integer
+          format: int64
+        label:
+          type: string
+        status:
+          type: string
+          enum: [AVAILABLE, LOCKED, BOOKED]
+
+    LockSeatsRequest:
+      type: object
+      required:
+        - seatLabels
+        - bookingId
+      properties:
+        seatLabels:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        bookingId:
+          type: integer
+          format: int64
+        lockTtlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 30
+          default: 10
+    ConfirmLockRequest:
+      type: object
+      required:
+        - bookingId
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+    ReleaseSeatsRequest:
+      type: object
+      required:
+        - bookingId
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+

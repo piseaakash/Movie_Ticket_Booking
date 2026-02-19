@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: Booking Service API
+  version: 1.0.0
+  description: APIs for customers to create and view ticket bookings.
+servers:
+  - url: /api
+
+paths:
+  /bookings:
+    post:
+      operationId: createBooking
+      summary: Create a booking
+      description: >
+        Creates a booking for the authenticated customer for a given show and seats.
+        The authenticated user id is taken from the JWT subject; the request body
+        supplies showId, tenantId and seats.
+      tags:
+        - Bookings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '409':
+          description: One or more seats not available (concurrent booking)
+    get:
+      operationId: listBookings
+      summary: List bookings for current customer
+      description: Returns bookings created by the authenticated customer.
+      tags:
+        - Bookings
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponse'
+        '401':
+          description: Missing or invalid token
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      summary: Get a booking by id
+      description: >
+        Returns booking details if it belongs to the authenticated customer.
+      tags:
+        - Bookings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Booking does not belong to current customer
+        '404':
+          description: Booking not found
+    post:
+      operationId: confirmBooking
+      summary: Confirm booking (payment success)
+      description: >
+        Call after payment success. Converts RESERVED booking to CONFIRMED and confirms
+        seat lock with the theatre. Without a real payment service, this simulates payment completion.
+      tags:
+        - Bookings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          description: Booking not in RESERVED state
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Booking does not belong to current customer
+        '404':
+          description: Booking not found
+    delete:
+      operationId: cancelBooking
+      summary: Cancel a booking
+      description: >
+        Cancels the booking and releases seats. Allowed for RESERVED or CONFIRMED.
+        Idempotent for already CANCELLED/EXPIRED.
+      tags:
+        - Bookings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Booking cancelled
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Booking does not belong to current customer
+        '404':
+          description: Booking not found
+  /bookings/reserve:
+    post:
+      operationId: reserveBooking
+      summary: Reserve booking (create booking + payment)
+      description: >
+        Orchestrated reserve: creates booking and then creates a PENDING payment.
+        If payment creation fails, the booking is cancelled (saga compensation).
+        Use confirm-payment endpoint after payment success.
+      tags:
+        - Bookings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveBookingRequest'
+      responses:
+        '201':
+          description: Booking and payment reserved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReserveBookingResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '409':
+          description: One or more seats not available
+  /bookings/confirm-payment:
+    post:
+      operationId: confirmPaymentAndBooking
+      summary: Confirm payment and booking
+      description: >
+        After payment success: confirms payment at payment-service then confirms booking.
+        On payment failure (e.g. already FAILED), cancels the booking and returns error.
+      tags:
+        - Bookings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentAndBookingRequest'
+      responses:
+        '200':
+          description: Payment and booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          description: Payment not in PENDING or booking not in RESERVED
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Resource does not belong to current customer
+        '404':
+          description: Booking or payment not found
+
+  /bookings/cancel-bulk:
+    post:
+      operationId: bulkCancelBookings
+      summary: Cancel multiple bookings
+      description: Cancels the given bookings for the current customer and releases seats. Returns results per id.
+      tags:
+        - Bookings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCancelRequest'
+      responses:
+        '200':
+          description: Bulk cancel result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCancelResponse'
+        '401':
+          description: Missing or invalid token
+
+components:
+  schemas:
+    ReserveBookingRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateBookingRequest'
+        - type: object
+          required: [amount, currency]
+          properties:
+            amount:
+              type: number
+              format: double
+              minimum: 0
+            currency:
+              type: string
+              minLength: 1
+              example: INR
+    ReserveBookingResponse:
+      type: object
+      required: [booking, paymentId]
+      properties:
+        booking:
+          $ref: '#/components/schemas/BookingResponse'
+        paymentId:
+          type: integer
+          format: int64
+    ConfirmPaymentAndBookingRequest:
+      type: object
+      required: [bookingId, paymentId]
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+        paymentId:
+          type: integer
+          format: int64
+    BulkCancelRequest:
+      type: object
+      required:
+        - bookingIds
+      properties:
+        bookingIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          minItems: 1
+    BulkCancelResponse:
+      type: object
+      required:
+        - cancelledIds
+        - failedIds
+      properties:
+        cancelledIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        failedIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Per-id error messages for failedIds
+    CreateBookingRequest:
+      type: object
+      required:
+        - showId
+        - tenantId
+        - seats
+      properties:
+        showId:
+          type: integer
+          format: int64
+        tenantId:
+          type: integer
+          format: int64
+          description: Tenant that owns the show/theatre
+        theatreId:
+          type: integer
+          format: int64
+          nullable: true
+        seats:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        totalPrice:
+          type: number
+          format: double
+          nullable: true
+          description: Optional; if omitted, can be computed server-side in the future.
+        lockTtlMinutes:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 30
+          description: Minutes to hold seat lock before expiry (default 15).
+    BookingResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - showId
+        - tenantId
+        - seats
+        - status
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        showId:
+          type: integer
+          format: int64
+        tenantId:
+          type: integer
+          format: int64
+        theatreId:
+          type: integer
+          format: int64
+          nullable: true
+        seats:
+          type: array
+          items:
+            type: string
+        totalPrice:
+          type: number
+          format: double
+          nullable: true
+        status:
+          type: string
+          enum: [RESERVED, CONFIRMED, CANCELLED, EXPIRED]
+        createdAt:
+          type: string
+          format: date-time
+        reservedUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the reservation expires (RESERVED only).
+

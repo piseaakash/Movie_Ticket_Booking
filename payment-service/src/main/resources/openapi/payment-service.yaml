@@ -1,0 +1,214 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  version: 1.0.0
+  description: APIs for customers to create and view payments for bookings. No real gateway integration; payments are recorded with status only.
+servers:
+  - url: /api
+
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      description: >
+        Creates a payment record for a booking. The authenticated user id is taken from the JWT (CUSTOMER role).
+        Payment is created with status PENDING. No real payment gateway is invoked.
+      tags:
+        - Payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Customer role required
+    get:
+      operationId: listPayments
+      summary: List payments for current customer
+      description: Returns payments created by the authenticated customer.
+      tags:
+        - Payments
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Customer role required
+
+  /payments/{id}:
+    get:
+      operationId: getPayment
+      summary: Get a payment by id
+      description: Returns payment details if it belongs to the authenticated customer.
+      tags:
+        - Payments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Payment does not belong to current customer
+        '404':
+          description: Payment not found
+    post:
+      operationId: confirmPayment
+      summary: Confirm payment (e.g. after gateway success)
+      description: >
+        Marks payment as CONFIRMED and optionally sets referenceId (gateway transaction id).
+        Callable by the same customer who created the payment (e.g. from orchestrator with forwarded JWT).
+      tags:
+        - Payments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+      responses:
+        '200':
+          description: Payment confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Payment not in PENDING state
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Payment does not belong to current customer
+        '404':
+          description: Payment not found
+  /payments/{id}/fail:
+    post:
+      operationId: failPayment
+      summary: Mark payment as failed
+      description: Marks payment as FAILED (e.g. after gateway failure or timeout).
+      tags:
+        - Payments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Payment marked failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Payment not in PENDING state
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Payment does not belong to current customer
+        '404':
+          description: Payment not found
+
+components:
+  schemas:
+    ConfirmPaymentRequest:
+      type: object
+      properties:
+        referenceId:
+          type: string
+          nullable: true
+          description: Gateway transaction id
+    CreatePaymentRequest:
+      type: object
+      required:
+        - bookingId
+        - amount
+        - currency
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+          description: Id of the booking this payment is for
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Payment amount
+        currency:
+          type: string
+          minLength: 1
+          example: INR
+          description: Currency code
+    PaymentResponse:
+      type: object
+      required:
+        - id
+        - bookingId
+        - userId
+        - amount
+        - currency
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        bookingId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, FAILED]
+        referenceId:
+          type: string
+          nullable: true
+          description: Optional reference (e.g. placeholder for gateway id)
+        createdAt:
+          type: string
+          format: date-time
